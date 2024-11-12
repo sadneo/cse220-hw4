@@ -53,39 +53,40 @@ int bind_socket(int listen_fd, uint16_t port) {
     return conn_fd;
 }
 
-void read_to_buffer(char[] buffer, int conn_fd) {
+void read_to_buffer(char buffer[], int conn_fd) {
     memset(buffer, 0, BUFFER_SIZE);
     int nbytes = read(conn_fd, buffer, BUFFER_SIZE);
     if (nbytes <= 0) {
-        printf("read_to_buffer failed")
+        printf("read_to_buffer failed");
         exit(EXIT_FAILURE);
     }
 }
 
-char[5] SEND_ERROR_BUFFER = "";
 void send_error(int conn_fd, int message) {
     // error is always 5 characters long
-    sprintf(&SEND_ERROR_BUFFER, "E %d", message);
-    send(conn_fd, SEND_ERROR_BUFFER, 5, 0);
+    char buffer[5] = "";
+    sprintf(buffer, "E %d", message);
+    send(conn_fd, buffer, 5, 0);
 }
 
 void send_a(int conn_fd, char* message, int len) {
     send(conn_fd, message, len, 0);
 }
 
-int get_piece_blocks(int piece_type, int rotation, int blocks[3][2]) {
+int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
+    int rotation = (rot - 1) % 4;
     switch (piece_type) {
         case 1: // Square 
             blocks[0][0] = 0; blocks[0][1] = 1;
-            blocks[1][0] = 1; blocks[1][1] = 0;
-            blocks[2][0] = 1; blocks[2][1] = 1;
+            blocks[1][0] = -1; blocks[1][1] = 0;
+            blocks[2][0] = -1; blocks[2][1] = 1;
             break;
 
         case 2: // Line
             if (rotation % 2 == 0) { // Vertical (rotations 0, 2)
-                blocks[0][0] = 1; blocks[0][1] = 0;
-                blocks[1][0] = 2; blocks[1][1] = 0;
-                blocks[2][0] = 3; blocks[2][1] = 0;
+                blocks[0][0] = -1; blocks[0][1] = 0;
+                blocks[1][0] = -2; blocks[1][1] = 0;
+                blocks[2][0] = -3; blocks[2][1] = 0;
             } else { // Horizontal (rotations 1, 3)
                 blocks[0][0] = 0; blocks[0][1] = 1;
                 blocks[1][0] = 0; blocks[1][1] = 2;
@@ -109,7 +110,7 @@ int get_piece_blocks(int piece_type, int rotation, int blocks[3][2]) {
             switch (rotation) {
                 case 0:
                     blocks[0][0] = -1; blocks[0][1] = 0;
-                    blocks[1][0] = -1; blocks[1][1] = 0;
+                    blocks[1][0] = -2; blocks[1][1] = 0;
                     blocks[2][0] = -2; blocks[2][1] = 1;
                     break;
                 case 1:
@@ -138,8 +139,8 @@ int get_piece_blocks(int piece_type, int rotation, int blocks[3][2]) {
                 break;
             } else { // Rotations 2, 4
                 blocks[0][0] = -1; blocks[0][1] = 0;
-                blocks[1][0] = -1; blocks[1][1] = 1;
-                blocks[2][0] = -2; blocks[2][1] = 1;
+                blocks[1][0] = 0; blocks[1][1] = 1;
+                blocks[2][0] = 1; blocks[2][1] = 1;
                 break;
             }
             break;
@@ -200,7 +201,6 @@ int get_piece_blocks(int piece_type, int rotation, int blocks[3][2]) {
     return 1; 
 }
 
-
 // EXPECTED:
 // begin: B 11 11
 // shoot: S 1 1
@@ -222,29 +222,30 @@ int main() {
 
     // 0 for blank tiles
     // 12345 for ships, positive if player1, negative if player2
-    int width, int height;
-    int *board = NULL;
+    int width, height;
+    int *board1 = NULL;
+    int *board2 = NULL;
     char buffer[BUFFER_SIZE] = {0};
 
     // begin
     while (1) {
         read_to_buffer(buffer, conn_fd1);
         if (strcmp(buffer, "B") != 0) {
-            send_error(conn_fd1, 100)); // Invalid packet type (Expected Begin packet)
+            send_error(conn_fd1, 100); // Invalid packet type (Expected Begin packet)
             continue;
         }
-        int scanned = sscanf(buffer, "%c %d %d", &packet_type, &width, &height);
         if (sscanf(buffer, "B %d %d", &width, &height) != 2) {
-            send_error(conn_fd1, 200)); // Invalid Begin packet (invalid number of parameters)
+            send_error(conn_fd1, 200); // Invalid Begin packet (invalid number of parameters)
             continue;
         }
         if (width < 10 || height < 10) {
             // 200: Invalid Begin packet (invalid number of parameters)
             // width or height less than 10, this is best matching error
-            send_error(conn_fd1, 200));
+            send_error(conn_fd1, 200);
             continue;
         }
-        board = malloc(sizeof(int) * width * height);
+        board1 = malloc(sizeof(int) * width * height);
+        board2 = malloc(sizeof(int) * width * height);
         send_a(conn_fd1, "A", 1);
         break;
     }
@@ -252,67 +253,70 @@ int main() {
     while (1) {
         read_to_buffer(buffer, conn_fd2);
         if (strcmp(buffer, "B") != 0) {
-            send_error(conn_fd1, 100)); // Invalid packet type (Expected Begin packet)
+            send_error(conn_fd2, 100); // Invalid packet type (Expected Begin packet)
             continue;
         }
         break;
     }
 
     while (1) {
+        memset(board1, 0, width * height);
         read_to_buffer(buffer, conn_fd1);
+        char *buffer_r = buffer + 2; // skip "I "
         if (strcmp(buffer, "I") != 0) {
-            send_error(conn_fd1, 101)); // Invalid packet type (Expected Init packet)
+            send_error(conn_fd1, 101); // Invalid packet type (Expected Init packet)
+            continue;
+        }
+        if (sscanf(buffer_r, "%*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d") < 20) {
+            send_error(conn_fd1, 201);
             continue;
         }
 
         int error = 0;
-        char *buffer_r = buffer + 2; // skip "I "
         for (int i = 0; i < 5; i++) {
             int type, rot, col, row;
 
             if (sscanf(buffer, "%d %d %d %d", &type, &rot, &col, &row) != 4) {
-                error = 201;
-                send_error(conn_fd1, 201)); // Invalid Init packet (invalid number of parameters)
+                printf("something fishy\n");
+                error = error > 201 ? 201 : error;
                 continue;
             }
-            if (row < 0 || col < 0 || col >= width || row >= height) {
-                error = 300;
-                send_error(conn_fd1, 300); // 300: Invalid Initialize packet (shape out of range)
+            if (type <= 0 || type > 7) {
+                error = error > 300 ? 300 : error;
+                continue;
+            }
+            if (rot <= 0 || rot > 4) {
+                error = error > 301 ? 301 : error;
                 continue;
             }
 
-            int location = board + row * width + col;
-            int rotation = (rot - 1) % 4;
-            int[3][2] offsets = piece_offsets(type, rotation, blocks, width);
-            int[4] locations = {0};
-            location[3] = location;
+            int offsets[3][2] = {0};
+            piece_offsets(type, rot, offsets);
+            int locations[4] = {0};
+            locations[3] = row * width + col;
 
-            int yes_continue = 0; // extra locations
             for (int i = 0; i < 3; i++) {
                 int this_row = row+offsets[i][0];
                 int this_col = col+offsets[i][0];
-                extra_locations[i] = board + this_row*width + this_col;
+                locations[i] = this_row*width + this_col;
                 if (this_row < 0 || this_row >= height || this_col < 0 || this_col > width) {
-                    error = 301
-                    send_error(conn_fd1, 301); // 301: Invalid Initialize packet (rotation out of range)
+                    error = error > 302 ? 302 : error;
                     break;
                 }
             }
-            if (yes_continue) { continue; }
 
             for (int i = 0; i < 4; i++) {
                 int location = locations[i];
-                if (board[location] != 0) {
-                    error = 303;
-                    send_error(conn_fd, 303);
+                if (location != 0) {
+                    error = error > 302 ? 302 : error;
                     break;
                 }
+                board1[location] = i + 1;
             }
-
-            // attempt to place pieces
-            // 301: Invalid Initialize packet (rotation out of range)
-            // 302: Invalid Initialize packet (ship doesn’t fit in game board)
-            // 303: Invalid Initialize packet (ships overlap)
+        }
+        if (error) {
+            send_error(conn_fd1, error);
+            continue;
         }
 
         send_a(conn_fd1, "A", 1);
@@ -328,6 +332,7 @@ int main() {
     //
     // The server should expect a Initialize packet on each port (first player 1, then player 2)
     // Acknowledge or send errors until a valid Initialization is received from each player
+    //
     // The server should expect either a Shoot, Query, or Forfeit packet from player 1.
     // If the packet was Query, reply and expect another packet
     // If the packet was Shoot, reply and expect a packet from the other player
