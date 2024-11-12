@@ -94,80 +94,78 @@ int get_piece_blocks(int piece_type, int rotation, int blocks[3][2]) {
             break;
 
         case 3: // Red Squiggle
-            switch (rotation) {
-                case 0: // Up
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 1;
-                    blocks[2][0] = 1; blocks[2][1] = 2;
-                    break;
-                case 1: // Right
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
-                    break;
-                case 2: // Down
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
-                    break;
-                case 3: // Left
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
-                    break;
+            if (rotation % 2 == 0) { // 1 and 3
+                blocks[0][0] = 0; blocks[0][1] = 1;
+                blocks[1][0] = 1; blocks[1][1] = 1;
+                blocks[2][0] = 1; blocks[2][1] = 2;
+            } else { // 2 and 4
+                blocks[0][0] = -1; blocks[0][1] = 0;
+                blocks[1][0] = -1; blocks[1][1] = 1;
+                blocks[2][0] = -2; blocks[2][1] = 1;
             }
             break;
 
         case 4: // Orange L
             switch (rotation) {
                 case 0:
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[0][0] = -1; blocks[0][1] = 0;
+                    blocks[1][0] = -1; blocks[1][1] = 0;
+                    blocks[2][0] = -2; blocks[2][1] = 1;
                     break;
                 case 1:
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[0][0] = -1; blocks[0][1] = 0;
+                    blocks[1][0] = 0; blocks[1][1] = 1;
+                    blocks[2][0] = 0; blocks[2][1] = 2;
                     break;
                 case 2:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[1][0] = -1; blocks[1][1] = 1;
+                    blocks[2][0] = -2; blocks[2][1] = 1;
                     break;
                 case 3:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[1][0] = 0; blocks[1][1] = 2;
+                    blocks[2][0] = 1; blocks[2][1] = 2;
                     break;
             }
             break;
 
-        case 5: // Green S
-            if (rotation % 2 == 0) { // Rotations 0, 2
+        case 5: // Green Squiggle
+            if (rotation % 2 == 0) { // Rotations 1, 3
                 blocks[0][0] = 0; blocks[0][1] = 1;
-                blocks[1][0] = 1; blocks[1][1] = 0;
-                blocks[2][0] = 1; blocks[2][1] = 1;
+                blocks[1][0] = -1; blocks[1][1] = 1;
+                blocks[2][0] = -1; blocks[2][1] = 2;
                 break;
-            } else { // Rotations 1, 3
-                blocks[0][0] = 0; blocks[0][1] = 1;
-                blocks[1][0] = 1; blocks[1][1] = 0;
-                blocks[2][0] = 1; blocks[2][1] = 1;
+            } else { // Rotations 2, 4
+                blocks[0][0] = -1; blocks[0][1] = 0;
+                blocks[1][0] = -1; blocks[1][1] = 1;
+                blocks[2][0] = -2; blocks[2][1] = 1;
                 break;
             }
             break;
 
-        case 6: // Pink Z
-            if (rotation % 2 == 0) { // Rotations 0, 2
-                blocks[0][0] = 0; blocks[0][1] = 1;
-                blocks[1][0] = 1; blocks[1][1] = 0;
-                blocks[2][0] = 1; blocks[2][1] = 1;
-                break;
-            } else { // Rotations 1, 3
-                blocks[0][0] = 0; blocks[0][1] = 1;
-                blocks[1][0] = 1; blocks[1][1] = 0;
-                blocks[2][0] = 1; blocks[2][1] = 1;
-                break;
+        case 6: // Pink L
+            switch (rotation) {
+                case 0:
+                    blocks[0][0] = 0; blocks[0][1] = 1;
+                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[2][0] = 2; blocks[2][1] = 1;
+                    break;
+                case 1:
+                    blocks[0][0] = -1; blocks[0][1] = 0;
+                    blocks[1][0] = -1; blocks[1][1] = 1;
+                    blocks[2][0] = -1; blocks[2][1] = 2;
+                    break;
+                case 2:
+                    blocks[0][0] = 0; blocks[0][1] = 1;
+                    blocks[1][0] = -1; blocks[1][1] = 0;
+                    blocks[2][0] = -2; blocks[2][1] = 0;
+                    break;
+                case 3:
+                    blocks[0][0] = 0; blocks[0][1] = 1;
+                    blocks[1][0] = 0; blocks[1][1] = 2;
+                    blocks[2][0] = -1; blocks[2][1] = 2;
+                    break;
             }
             break;
 
@@ -175,23 +173,23 @@ int get_piece_blocks(int piece_type, int rotation, int blocks[3][2]) {
             switch (rotation) {
                 case 0:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[1][0] = 0; blocks[1][1] = 2;
+                    blocks[2][0] = -1; blocks[2][1] = 1;
                     break;
                 case 1:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[2][0] = -1; blocks[2][1] = 1;
                     break;
                 case 2:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[2][0] = 0; blocks[2][1] = 2;
                     break;
                 case 3:
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 0;
-                    blocks[2][0] = 1; blocks[2][1] = 1;
+                    blocks[0][0] = -1; blocks[0][1] = 0;
+                    blocks[1][0] = -1; blocks[1][1] = 1;
+                    blocks[2][0] = -2; blocks[2][1] = 0;
                     break;
             }
             break;
@@ -267,22 +265,49 @@ int main() {
             continue;
         }
 
+        int error = 0;
         char *buffer_r = buffer + 2; // skip "I "
         for (int i = 0; i < 5; i++) {
             int type, rot, col, row;
+
             if (sscanf(buffer, "%d %d %d %d", &type, &rot, &col, &row) != 4) {
+                error = 201;
                 send_error(conn_fd1, 201)); // Invalid Init packet (invalid number of parameters)
                 continue;
             }
             if (row < 0 || col < 0 || col >= width || row >= height) {
-                // 300: Invalid Initialize packet (shape out of range)
-                send_error(conn_fd1, 300);
+                error = 300;
+                send_error(conn_fd1, 300); // 300: Invalid Initialize packet (shape out of range)
                 continue;
             }
 
             int location = board + row * width + col;
             int rotation = (rot - 1) % 4;
-            int[4] offsets = piece_offsets(type, rotation, blocks, width);
+            int[3][2] offsets = piece_offsets(type, rotation, blocks, width);
+            int[4] locations = {0};
+            location[3] = location;
+
+            int yes_continue = 0; // extra locations
+            for (int i = 0; i < 3; i++) {
+                int this_row = row+offsets[i][0];
+                int this_col = col+offsets[i][0];
+                extra_locations[i] = board + this_row*width + this_col;
+                if (this_row < 0 || this_row >= height || this_col < 0 || this_col > width) {
+                    error = 301
+                    send_error(conn_fd1, 301); // 301: Invalid Initialize packet (rotation out of range)
+                    break;
+                }
+            }
+            if (yes_continue) { continue; }
+
+            for (int i = 0; i < 4; i++) {
+                int location = locations[i];
+                if (board[location] != 0) {
+                    error = 303;
+                    send_error(conn_fd, 303);
+                    break;
+                }
+            }
 
             // attempt to place pieces
             // 301: Invalid Initialize packet (rotation out of range)
