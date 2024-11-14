@@ -9,6 +9,8 @@
 #define PORT2 2202
 #define BUFFER_SIZE 1024
 
+char return_buffer[1028] = "";
+
 int create_socket() {
     int opt = 1;
     int fd = 0;
@@ -34,7 +36,7 @@ int bind_socket(int listen_fd, uint16_t port) {
     int addrlen = sizeof(address);
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT1);
+    address.sin_port = htons(port);
     if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("[Server] bind() failed.");
         exit(EXIT_FAILURE);
@@ -57,16 +59,15 @@ void read_to_buffer(char buffer[], int conn_fd) {
     memset(buffer, 0, BUFFER_SIZE);
     int nbytes = read(conn_fd, buffer, BUFFER_SIZE);
     if (nbytes <= 0) {
-        printf("read_to_buffer failed");
+        printf("[Server] read() failed");
         exit(EXIT_FAILURE);
     }
 }
 
 void send_error(int conn_fd, int message) {
-    // error is always 5 characters long
-    char buffer[5] = "";
-    sprintf(buffer, "E %d", message);
-    send(conn_fd, buffer, 5, 0);
+    memset(return_buffer, 0, 1028)
+    sprintf(return_buffer, "E %d", message);
+    send(conn_fd, return_buffer, 5, 0);
 }
 
 void send_a(int conn_fd, char* message, int len) {
@@ -217,8 +218,9 @@ int main() {
     int listen_fd1 = create_socket();
     int listen_fd2 = create_socket();
     int conn_fd1 = bind_socket(listen_fd1, PORT1);
+    printf("Player 1 connected.\n");
     int conn_fd2 = bind_socket(listen_fd2, PORT2);
-    printf("sockets create/bind/listen/accept done\n");
+    printf("Connections complete.\n");
 
     // 0 for blank tiles
     // 12345 for ships, positive if player1, negative if player2
@@ -230,18 +232,12 @@ int main() {
     // begin
     while (1) {
         read_to_buffer(buffer, conn_fd1);
-        if (strcmp(buffer, "B") != 0) {
+        if (*buffer != 'B') {
             send_error(conn_fd1, 100); // Invalid packet type (Expected Begin packet)
             continue;
         }
-        if (sscanf(buffer, "B %d %d", &width, &height) != 2) {
-            send_error(conn_fd1, 200); // Invalid Begin packet (invalid number of parameters)
-            continue;
-        }
-        if (width < 10 || height < 10) {
-            // 200: Invalid Begin packet (invalid number of parameters)
-            // width or height less than 10, this is best matching error
-            send_error(conn_fd1, 200);
+        if (sscanf(buffer, "B %d %d", &width, &height) != 2 || width < 10 || height < 10) {
+            send_error(conn_fd1, 200); // Invalid Begin packet (invalid parameters)
             continue;
         }
         board1 = malloc(sizeof(int) * width * height);
@@ -249,6 +245,7 @@ int main() {
         send_a(conn_fd1, "A", 1);
         break;
     }
+    printf("Player 1 began\n");
 
     while (1) {
         read_to_buffer(buffer, conn_fd2);
@@ -258,29 +255,29 @@ int main() {
         }
         break;
     }
+    printf("Player 2 began\n");
 
     while (1) {
         memset(board1, 0, width * height);
         read_to_buffer(buffer, conn_fd1);
-        char *buffer_r = buffer + 2; // skip "I "
-        if (strcmp(buffer, "I") != 0) {
+        if (*buffer != 'I') {
             send_error(conn_fd1, 101); // Invalid packet type (Expected Init packet)
             continue;
         }
-        if (sscanf(buffer_r, "%*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d") < 20) {
+
+        int ship_data[20] = {0};
+        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19]) < 20) {
             send_error(conn_fd1, 201);
             continue;
         }
 
-        int error = 0;
+        int error = 1000;
         for (int i = 0; i < 5; i++) {
-            int type, rot, col, row;
+            int type = *(buffer + i*4 + 0);
+            int rot = *(buffer + i*4 + 1);
+            int col = *(buffer + i*4 + 2);
+            int row = *(buffer + i*4 + 3);
 
-            if (sscanf(buffer, "%d %d %d %d", &type, &rot, &col, &row) != 4) {
-                printf("something fishy\n");
-                error = error > 201 ? 201 : error;
-                continue;
-            }
             if (type <= 0 || type > 7) {
                 error = error > 300 ? 300 : error;
                 continue;
@@ -293,13 +290,12 @@ int main() {
             int offsets[3][2] = {0};
             piece_offsets(type, rot, offsets);
             int locations[4] = {0};
-            locations[3] = row * width + col;
-
+            locations[0] = row * width + col;
             for (int i = 0; i < 3; i++) {
-                int this_row = row+offsets[i][0];
-                int this_col = col+offsets[i][0];
-                locations[i] = this_row*width + this_col;
-                if (this_row < 0 || this_row >= height || this_col < 0 || this_col > width) {
+                int offset_row = row+offsets[i][0];
+                int offset_column = col+offsets[i][0];
+                locations[i+1] = offset_row * width + offset_column;
+                if (offset_row < 0 || offset_row >= height || offset_col < 0 || offset_col > width) {
                     error = error > 302 ? 302 : error;
                     break;
                 }
@@ -308,13 +304,13 @@ int main() {
             for (int i = 0; i < 4; i++) {
                 int location = locations[i];
                 if (location != 0) {
-                    error = error > 302 ? 302 : error;
+                    error = error > 303 ? 303 : error;
                     break;
                 }
                 board1[location] = i + 1;
             }
         }
-        if (error) {
+        if (error < 1000) {
             send_error(conn_fd1, error);
             continue;
         }
