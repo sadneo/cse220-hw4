@@ -65,13 +65,22 @@ void read_to_buffer(char buffer[], int conn_fd) {
 }
 
 void send_error(int conn_fd, int message) {
-    memset(return_buffer, 0, 1028)
+    memset(return_buffer, 0, 1028);
     sprintf(return_buffer, "E %d", message);
     send(conn_fd, return_buffer, 5, 0);
 }
 
 void send_a(int conn_fd, char* message, int len) {
     send(conn_fd, message, len, 0);
+}
+
+int print_board(int board[], int width, int height) {
+    for (int row = 0; row < height; row++) {
+        for (int col = 0; col < width; col++) {
+            printf("%d ", board[row * width + col]);
+        }
+        printf("\n");
+    }
 }
 
 int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
@@ -199,6 +208,13 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
         default:
             return 0; // Invalid piece type
     }
+
+    printf("OFFSETS\n");
+    for (int i = 0; i < 3; i++) {
+        blocks[i][0] = -1 * blocks[i][0];
+        printf("%d %d\n", blocks[i][0], blocks[i][1]);
+    }
+
     return 1; 
 }
 
@@ -229,9 +245,15 @@ int main() {
     int *board2 = NULL;
     char buffer[BUFFER_SIZE] = {0};
 
-    // begin
+    // TODO: check for extra parameters in begin1, 2, and initialize
     while (1) {
         read_to_buffer(buffer, conn_fd1);
+        if (strcmp(buffer, "F") == 0) {
+            send_a(conn_fd1, "H 0", 3);
+            send_a(conn_fd2, "H 1", 3);
+            goto cleanup;
+        }
+
         if (*buffer != 'B') {
             send_error(conn_fd1, 100); // Invalid packet type (Expected Begin packet)
             continue;
@@ -249,10 +271,16 @@ int main() {
 
     while (1) {
         read_to_buffer(buffer, conn_fd2);
+        if (strcmp(buffer, "F") == 0) {
+            send_a(conn_fd1, "H 1", 3);
+            send_a(conn_fd2, "H 0", 3);
+            goto cleanup;
+        }
         if (strcmp(buffer, "B") != 0) {
             send_error(conn_fd2, 100); // Invalid packet type (Expected Begin packet)
             continue;
         }
+        send_a(conn_fd2, "A", 1);
         break;
     }
     printf("Player 2 began\n");
@@ -260,6 +288,11 @@ int main() {
     while (1) {
         memset(board1, 0, width * height);
         read_to_buffer(buffer, conn_fd1);
+        if (strcmp(buffer, "F") == 0) {
+            send_a(conn_fd1, "H 0", 3);
+            send_a(conn_fd2, "H 1", 3);
+            goto cleanup;
+        }
         if (*buffer != 'I') {
             send_error(conn_fd1, 101); // Invalid packet type (Expected Init packet)
             continue;
@@ -271,13 +304,15 @@ int main() {
             continue;
         }
 
+        printf("Start parsing init:\n");
         int error = 1000;
-        for (int i = 0; i < 5; i++) {
-            int type = *(buffer + i*4 + 0);
-            int rot = *(buffer + i*4 + 1);
-            int col = *(buffer + i*4 + 2);
-            int row = *(buffer + i*4 + 3);
+        for (int ship_no = 0; ship_no < 5; ship_no++) {
+            int type = *(ship_data + ship_no*4 + 0);
+            int rot = *(ship_data + ship_no*4 + 1);
+            int col = *(ship_data + ship_no*4 + 2) - 1;
+            int row = *(ship_data + ship_no*4 + 3) - 1;
 
+            printf("type %d, rot %d, col %d, row %d\n", type, rot, col, row);
             if (type <= 0 || type > 7) {
                 error = error > 300 ? 300 : error;
                 continue;
@@ -293,9 +328,9 @@ int main() {
             locations[0] = row * width + col;
             for (int i = 0; i < 3; i++) {
                 int offset_row = row+offsets[i][0];
-                int offset_column = col+offsets[i][0];
+                int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
-                if (offset_row < 0 || offset_row >= height || offset_col < 0 || offset_col > width) {
+                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column > width) {
                     error = error > 302 ? 302 : error;
                     break;
                 }
@@ -303,12 +338,14 @@ int main() {
 
             for (int i = 0; i < 4; i++) {
                 int location = locations[i];
-                if (location != 0) {
+                if (board1[location] != 0) {
                     error = error > 303 ? 303 : error;
                     break;
                 }
-                board1[location] = i + 1;
+                board1[location] = ship_no + 1;
             }
+            printf("BOARD_STATE:\n");
+            print_board(board1, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd1, error);
@@ -318,17 +355,100 @@ int main() {
         send_a(conn_fd1, "A", 1);
         break;
     }
+    printf("Player 1 initialized\n");
+
+    while (1) {
+        memset(board2, 0, width * height);
+        read_to_buffer(buffer, conn_fd2);
+        if (strcmp(buffer, "F") == 0) {
+            send_a(conn_fd1, "H 1", 3);
+            send_a(conn_fd2, "H 0", 3);
+            goto cleanup;
+        }
+        if (*buffer != 'I') {
+            send_error(conn_fd2, 101); // Invalid packet type (Expected Init packet)
+            continue;
+        }
+
+        int ship_data[20] = {0};
+        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19]) < 20) {
+            send_error(conn_fd2, 201);
+            continue;
+        }
+
+        printf("Start parsing init:\n");
+        int error = 1000;
+        for (int ship_no = 0; ship_no < 5; ship_no++) {
+            int type = *(ship_data + ship_no*4 + 0);
+            int rot = *(ship_data + ship_no*4 + 1);
+            int col = *(ship_data + ship_no*4 + 2) - 1;
+            int row = *(ship_data + ship_no*4 + 3) - 1;
+
+            printf("type %d, rot %d, col %d, row %d\n", type, rot, col, row);
+            if (type <= 0 || type > 7) {
+                error = error > 300 ? 300 : error;
+                continue;
+            }
+            if (rot <= 0 || rot > 4) {
+                error = error > 301 ? 301 : error;
+                continue;
+            }
+
+            int offsets[3][2] = {0};
+            piece_offsets(type, rot, offsets);
+            int locations[4] = {0};
+            locations[0] = row * width + col;
+            for (int i = 0; i < 3; i++) {
+                int offset_row = row+offsets[i][0];
+                int offset_column = col+offsets[i][1];
+                locations[i+1] = offset_row * width + offset_column;
+                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column > width) {
+                    error = error > 302 ? 302 : error;
+                    break;
+                }
+            }
+
+            for (int i = 0; i < 4; i++) {
+                int location = locations[i];
+                if (board2[location] != 0) {
+                    error = error > 303 ? 303 : error;
+                    break;
+                }
+                board2[location] = ship_no + 1;
+            }
+            printf("BOARD_STATE:\n");
+            print_board(board2, width, height);
+        }
+        if (error < 1000) {
+            send_error(conn_fd2, error);
+            continue;
+        }
+
+        send_a(conn_fd2, "A", 1);
+        break;
+    }
+    printf("Player 2 initialized\n");
 
 
-    //      The server should attempt to bind/listen/accept on both ports. (2201 is player 1 and 2202 is player 2)
-    //      The server should expect a Begin packet from player 1 that contains a board size of at least 10 x 10.
-    // Acknowledge or send errors until a Begin is received from both player 1
-    //
-    // The server should expect a Begin packet from player 2 that contains no parameters
-    //
-    // The server should expect a Initialize packet on each port (first player 1, then player 2)
-    // Acknowledge or send errors until a valid Initialization is received from each player
-    //
+    while (1) {
+        // player 1's turn
+        read_to_buffer(buffer, conn_fd2);
+        if (strcmp(buffer, "F") == 0) {
+            send_a(conn_fd1, "H 0", 3);
+            send_a(conn_fd2, "H 1", 3);
+            goto cleanup;
+        }
+        // shoot, query, or forfeit
+
+        // player 2's turn
+        read_to_buffer(buffer, conn_fd2);
+        if (strcmp(buffer, "F") == 0) {
+            send_a(conn_fd1, "H 1", 3);
+            send_a(conn_fd2, "H 0", 3);
+            goto cleanup;
+        }
+    }
+
     // The server should expect either a Shoot, Query, or Forfeit packet from player 1.
     // If the packet was Query, reply and expect another packet
     // If the packet was Shoot, reply and expect a packet from the other player
@@ -338,6 +458,7 @@ int main() {
     // Same behavior as above
     // If a shoot packet sinks the last ship, send a Halt to both players
 
+cleanup:
     close(conn_fd1);
     close(conn_fd2);
     close(listen_fd1);
