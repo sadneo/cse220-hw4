@@ -11,9 +11,15 @@
 
 char return_buffer[1028] = "";
 
-int create_socket() {
+int bind_socket(uint16_t port) {
     int opt = 1;
     int fd = 0;
+    struct sockaddr_in address;
+    int addrlen = sizeof(address);
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
         exit(EXIT_FAILURE);
@@ -28,24 +34,25 @@ int create_socket() {
         perror("setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt))");
         exit(EXIT_FAILURE);
     }
+
+    // Bind 'em
+    if (bind(fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("[Server] bind() failed.");
+        exit(EXIT_FAILURE);
+    }
+    if (listen(fd, 3) < 0) {
+        perror("[Server] listen() failed.");
+        exit(EXIT_FAILURE);
+    }
     return fd;
 }
 
-int bind_socket(int listen_fd, uint16_t port) {
+int listen_socket(int listen_fd, uint16_t port) {
     struct sockaddr_in address;
     int addrlen = sizeof(address);
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(port);
-    if (bind(listen_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        perror("[Server] bind() failed.");
-        exit(EXIT_FAILURE);
-    }
-
-    if (listen(listen_fd, 3) < 0) {
-        perror("[Server] listen() failed.");
-        exit(EXIT_FAILURE);
-    }
 
     int conn_fd = 0;
     if ((conn_fd = accept(listen_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
@@ -231,11 +238,11 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
 // S response R <ships_remaining> <{M for miss, H for hit}>
 // Q response: G <ships_remaining> for_each_guess:<{‘M’ for miss, ‘H’ for hit} column# row#>
 int main() {
-    int listen_fd1 = create_socket();
-    int listen_fd2 = create_socket();
-    int conn_fd1 = bind_socket(listen_fd1, PORT1);
+    int listen_fd1 = bind_socket(PORT1);
+    int listen_fd2 = bind_socket(PORT2);
+    int conn_fd1 = listen_socket(listen_fd1, PORT1);
     printf("Player 1 connected.\n");
-    int conn_fd2 = bind_socket(listen_fd2, PORT2);
+    int conn_fd2 = listen_socket(listen_fd2, PORT2);
     printf("Connections complete.\n");
 
     // 0 for blank tiles
