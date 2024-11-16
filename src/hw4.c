@@ -83,6 +83,7 @@ void send_a(int conn_fd, char* message, int len) {
 
 int print_board(int board[], int width, int height) {
     for (int row = 0; row < height; row++) {
+        printf("\t");
         for (int col = 0; col < width; col++) {
             printf("%d ", board[row * width + col]);
         }
@@ -216,21 +217,30 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
             return 0; // Invalid piece type
     }
 
-    printf("OFFSETS\n");
     for (int i = 0; i < 3; i++) {
         blocks[i][0] = -1 * blocks[i][0];
-        printf("%d %d\n", blocks[i][0], blocks[i][1]);
     }
 
     return 1; 
 }
 
-// EXPECTED:
-// begin: B 11 11
-// shoot: S 1 1
-// query: Q
-// forfeit: F
-//
+struct HistoryItem {
+    int row;
+    int col;
+    char hit; // 1 if hit, 0 if miss
+};
+
+int check_history(struct HistoryItem *history, int history_size, int shoot_row, int shoot_col) {
+    for (int i = 0; i < history_size; i++) {
+        struct HistoryItem item = history[i];
+        if (item.row == shoot_row || item.row == shoot_col) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 // RESPONSE:
 // error: E 101
 // halt: H 1
@@ -248,11 +258,15 @@ int main() {
     // 0 for blank tiles
     // 12345 for ships, positive if player1, negative if player2
     int width, height;
+    int history_size1 = 0;
+    int history_size2 = 0;
     int *board1 = NULL;
     int *board2 = NULL;
+    struct HistoryItem *history1 = NULL;
+    struct HistoryItem *history2 = NULL;
     char buffer[BUFFER_SIZE] = {0};
+    char overflow_buffer[BUFFER_SIZE] = {0};
 
-    // TODO: check for extra parameters in begin1, 2, and initialize
     while (1) {
         read_to_buffer(buffer, conn_fd1);
         if (strcmp(buffer, "F") == 0) {
@@ -265,12 +279,14 @@ int main() {
             send_error(conn_fd1, 100); // Invalid packet type (Expected Begin packet)
             continue;
         }
-        if (sscanf(buffer, "B %d %d", &width, &height) != 2 || width < 10 || height < 10) {
+        if (sscanf(buffer, "B %d %d %s", &width, &height, overflow_buffer) != 2 || width < 10 || height < 10) {
             send_error(conn_fd1, 200); // Invalid Begin packet (invalid parameters)
             continue;
         }
         board1 = malloc(sizeof(int) * width * height);
         board2 = malloc(sizeof(int) * width * height);
+        history1 = malloc(sizeof(struct HistoryItem) * width * height);
+        history2 = malloc(sizeof(struct HistoryItem) * width * height);
         send_a(conn_fd1, "A", 1);
         break;
     }
@@ -283,8 +299,11 @@ int main() {
             send_a(conn_fd2, "H 0", 3);
             goto cleanup;
         }
-        if (strcmp(buffer, "B") != 0) {
+        if (*buffer != 'B') {
             send_error(conn_fd2, 100); // Invalid packet type (Expected Begin packet)
+            continue;
+        } else if (sscanf(buffer, "B %s", overflow_buffer) == 1) {
+            send_error(conn_fd2, 200); // Invalid packet type (Expected Begin packet)
             continue;
         }
         send_a(conn_fd2, "A", 1);
@@ -293,7 +312,7 @@ int main() {
     printf("Player 2 began\n");
 
     while (1) {
-        memset(board1, 0, width * height);
+        memset(board1, 0, width * height * sizeof(*board1));
         read_to_buffer(buffer, conn_fd1);
         if (strcmp(buffer, "F") == 0) {
             send_a(conn_fd1, "H 0", 3);
@@ -306,20 +325,20 @@ int main() {
         }
 
         int ship_data[20] = {0};
-        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19]) < 20) {
+        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19], overflow_buffer) != 20) {
             send_error(conn_fd1, 201);
             continue;
         }
 
-        printf("Start parsing init:\n");
+        // printf("Player 1 init:\n");
         int error = 1000;
         for (int ship_no = 0; ship_no < 5; ship_no++) {
             int type = *(ship_data + ship_no*4 + 0);
             int rot = *(ship_data + ship_no*4 + 1);
-            int col = *(ship_data + ship_no*4 + 2) - 1;
-            int row = *(ship_data + ship_no*4 + 3) - 1;
+            int col = *(ship_data + ship_no*4 + 2);
+            int row = *(ship_data + ship_no*4 + 3);
 
-            printf("type %d, rot %d, col %d, row %d\n", type, rot, col, row);
+            // printf("\ttype %d, rot %d, col %d, row %d\n", type, rot, col, row);
             if (type <= 0 || type > 7) {
                 error = error > 300 ? 300 : error;
                 continue;
@@ -333,10 +352,12 @@ int main() {
             piece_offsets(type, rot, offsets);
             int locations[4] = {0};
             locations[0] = row * width + col;
+            // printf("Location 0: %d\n", locations[0]);
             for (int i = 0; i < 3; i++) {
                 int offset_row = row+offsets[i][0];
                 int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
+                // printf("Location %d: %d, row: %d, col: %d\n", i+1, locations[i+1], offset_row, offset_column);
                 if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column > width) {
                     error = error > 302 ? 302 : error;
                     break;
@@ -351,8 +372,8 @@ int main() {
                 }
                 board1[location] = ship_no + 1;
             }
-            printf("BOARD_STATE:\n");
-            print_board(board1, width, height);
+            // printf("\tBOARD_STATE:\n");
+            // print_board(board1, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd1, error);
@@ -365,11 +386,11 @@ int main() {
     printf("Player 1 initialized\n");
 
     while (1) {
-        memset(board2, 0, width * height);
+        memset(board2, 0, width * height * sizeof(*board2));
         read_to_buffer(buffer, conn_fd2);
         if (strcmp(buffer, "F") == 0) {
-            send_a(conn_fd1, "H 1", 3);
             send_a(conn_fd2, "H 0", 3);
+            send_a(conn_fd1, "H 1", 3);
             goto cleanup;
         }
         if (*buffer != 'I') {
@@ -378,20 +399,20 @@ int main() {
         }
 
         int ship_data[20] = {0};
-        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19]) < 20) {
+        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19], overflow_buffer) != 20) {
             send_error(conn_fd2, 201);
             continue;
         }
 
-        printf("Start parsing init:\n");
+        // printf("Player 1 init:\n");
         int error = 1000;
         for (int ship_no = 0; ship_no < 5; ship_no++) {
             int type = *(ship_data + ship_no*4 + 0);
             int rot = *(ship_data + ship_no*4 + 1);
-            int col = *(ship_data + ship_no*4 + 2) - 1;
-            int row = *(ship_data + ship_no*4 + 3) - 1;
+            int col = *(ship_data + ship_no*4 + 2);
+            int row = *(ship_data + ship_no*4 + 3);
 
-            printf("type %d, rot %d, col %d, row %d\n", type, rot, col, row);
+            // printf("\ttype %d, rot %d, col %d, row %d\n", type, rot, col, row);
             if (type <= 0 || type > 7) {
                 error = error > 300 ? 300 : error;
                 continue;
@@ -405,10 +426,12 @@ int main() {
             piece_offsets(type, rot, offsets);
             int locations[4] = {0};
             locations[0] = row * width + col;
+            // printf("Location 0: %d\n", locations[0]);
             for (int i = 0; i < 3; i++) {
                 int offset_row = row+offsets[i][0];
                 int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
+                // printf("Location %d: %d, row: %d, col: %d\n", i+1, locations[i+1], offset_row, offset_column);
                 if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column > width) {
                     error = error > 302 ? 302 : error;
                     break;
@@ -423,8 +446,8 @@ int main() {
                 }
                 board2[location] = ship_no + 1;
             }
-            printf("BOARD_STATE:\n");
-            print_board(board2, width, height);
+            // printf("\tBOARD_STATE:\n");
+            // print_board(board2, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd2, error);
@@ -436,34 +459,92 @@ int main() {
     }
     printf("Player 2 initialized\n");
 
-
     while (1) {
         // player 1's turn
-        read_to_buffer(buffer, conn_fd2);
-        if (strcmp(buffer, "F") == 0) {
-            send_a(conn_fd1, "H 0", 3);
-            send_a(conn_fd2, "H 1", 3);
-            goto cleanup;
+        while (1) {
+            read_to_buffer(buffer, conn_fd1);
+            if (strcmp(buffer, "F") == 0) {
+                send_a(conn_fd1, "H 0", 3);
+                send_a(conn_fd2, "H 1", 3);
+                goto cleanup;
+            } else if (*buffer == 'S') {
+                int shoot_row, shoot_col;
+                if (sscanf(buffer, "S %d %d %s", &shoot_row, &shoot_col, overflow_buffer) != 2) {
+                    send_error(conn_fd1, 202);
+                    continue;
+                }
+                if (shoot_row < 0 || shoot_row >= height || shoot_col < 0 || shoot_col >= height) {
+                    send_error(conn_fd1, 400);
+                    continue;
+                }
+                if (check_history(history1, history_size1, shoot_row, shoot_col)) {
+                    send_error(conn_fd1, 401);
+                    continue;
+                }
+                
+                int hit_ship = board1[shoot_row * width + shoot_col];
+                char h_or_m = hit_ship == 0 ? 'M' : 'H';
+                if (hit_ship != 0) {
+                    for (int row = 0; row < height; row++) {
+                        for (int col = 0; col < width; col++) {
+                            if (board1[row * width + col] == hit_ship) {
+                                board1[row*width+col] = 0;
+                            }
+                        }
+                    }
+                }
+
+                int encountered_ships[5] = {0};
+                int ships_remaining = 0;
+                for (int row = 0; row < height; row++) {
+                    for (int col = 0; col < width; col++) {
+                        int ship = board1[row*width+col];
+                        if (ship != 0) {
+                            encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
+                        }
+                    }
+                }
+                for (int i = 0; i < 5; i++) {
+                    ships_remaining += encountered_ships[i];
+                }
+
+                struct HistoryItem new_history_item = history1[history_size1];
+                new_history_item.row = shoot_row;
+                new_history_item.col = shoot_col;
+                new_history_item.hit = h_or_m;
+                history_size1++;
+
+                memset(return_buffer, 0, 1028);
+                sprintf(return_buffer, "R 5 %d %c", ships_remaining, h_or_m);
+                send_a(conn_fd1, return_buffer, strlen(return_buffer));
+
+                if (ships_remaining == 0) {
+                    send_a(conn_fd1, "H 1", 3);
+                    send_a(conn_fd2, "H 0", 3);
+                    goto cleanup;
+                }
+                break;
+            } else if (*buffer == 'Q') {
+                struct HistoryItem *temp_history = malloc(sizeof(struct HistoryItem) * width * height);
+                for (int i = 0; i < history_size1; i++) {
+                    temp_history[i].row = history1[i].row;
+                    temp_history[i].col = history1[i].col;
+                    temp_history[i].hit = history1[i].hit;
+                }
+                sort(temp_history, width * height);
+
+                memset(return_buffer, 0, 1028);
+                sprintf(return_buffer, "R 5 %d %c", ships_remaining, h_or_m); // TODO set string fr
+                free(temp_history);
+
+                send_a(conn_fd1, return_buffer, strlen(return_buffer));
+            } else {
+                send_error(conn_fd1, 102);
+            }
         }
-        // shoot, query, or forfeit
 
         // player 2's turn
-        read_to_buffer(buffer, conn_fd2);
-        if (strcmp(buffer, "F") == 0) {
-            send_a(conn_fd1, "H 1", 3);
-            send_a(conn_fd2, "H 0", 3);
-            goto cleanup;
-        }
     }
-
-    // The server should expect either a Shoot, Query, or Forfeit packet from player 1.
-    // If the packet was Query, reply and expect another packet
-    // If the packet was Shoot, reply and expect a packet from the other player
-    // If the packet was Forfeit, reply with Halts to both players
-    // Otherwise send errors until a valid packet arrives
-    // The server then should expect a Shoot, Query, or Forfeit packet from player 2.
-    // Same behavior as above
-    // If a shoot packet sinks the last ship, send a Halt to both players
 
 cleanup:
     close(conn_fd1);
