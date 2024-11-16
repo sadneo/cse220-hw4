@@ -85,7 +85,14 @@ int print_board(int board[], int width, int height) {
     for (int row = 0; row < height; row++) {
         printf("\t");
         for (int col = 0; col < width; col++) {
-            printf("%d ", board[row * width + col]);
+            int tile = board[row * width + col];
+            if (tile == -1) {
+                printf("X ");
+            } else if (tile == 0) {
+                printf("_ ");
+            } else {
+                printf("%d ", tile);
+            }
         }
         printf("\n");
     }
@@ -335,9 +342,10 @@ int main() {
             continue;
         }
 
-        // printf("Player 1 init:\n");
         int error = 1000;
         for (int ship_no = 0; ship_no < 5; ship_no++) {
+            // printf("Player 1 init:\n");
+            // print_board(board1, width, height);
             int type = *(ship_data + ship_no*4 + 0);
             int rot = *(ship_data + ship_no*4 + 1);
             int col = *(ship_data + ship_no*4 + 2);
@@ -389,6 +397,7 @@ int main() {
         break;
     }
     printf("Player 1 initialized\n");
+    print_board(board1, width, height);
 
     while (1) {
         memset(board2, 0, width * height * sizeof(*board2));
@@ -409,7 +418,6 @@ int main() {
             continue;
         }
 
-        // printf("Player 1 init:\n");
         int error = 1000;
         for (int ship_no = 0; ship_no < 5; ship_no++) {
             int type = *(ship_data + ship_no*4 + 0);
@@ -463,6 +471,11 @@ int main() {
         break;
     }
     printf("Player 2 initialized\n");
+
+    printf("Board 1\n");
+    print_board(board1, width, height);
+    printf("Board 2\n");
+    print_board(board2, width, height);
 
     while (1) {
         // player 1's turn
@@ -549,6 +562,10 @@ int main() {
                 send_error(conn_fd1, 102);
             }
         }
+        printf("Board 1\n");
+        print_board(board1, width, height);
+        printf("Board 2\n");
+        print_board(board2, width, height);
 
         // player 2's turn
         while (1) {
@@ -634,6 +651,10 @@ int main() {
                 send_error(conn_fd2, 102);
             }
         }
+        printf("Board 1\n");
+        print_board(board1, width, height);
+        printf("Board 2\n");
+        print_board(board2, width, height);
     }
 
 cleanup:
