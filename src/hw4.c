@@ -96,15 +96,15 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
     switch (piece_type) {
         case 1: // Square 
             blocks[0][0] = 0; blocks[0][1] = 1;
-            blocks[1][0] = -1; blocks[1][1] = 0;
-            blocks[2][0] = -1; blocks[2][1] = 1;
+            blocks[1][0] = 1; blocks[1][1] = 0;
+            blocks[2][0] = 1; blocks[2][1] = 1;
             break;
 
         case 2: // Line
             if (rotation % 2 == 0) { // Vertical (rotations 0, 2)
-                blocks[0][0] = -1; blocks[0][1] = 0;
-                blocks[1][0] = -2; blocks[1][1] = 0;
-                blocks[2][0] = -3; blocks[2][1] = 0;
+                blocks[0][0] = 1; blocks[0][1] = 0;
+                blocks[1][0] = 2; blocks[1][1] = 0;
+                blocks[2][0] = 3; blocks[2][1] = 0;
             } else { // Horizontal (rotations 1, 3)
                 blocks[0][0] = 0; blocks[0][1] = 1;
                 blocks[1][0] = 0; blocks[1][1] = 2;
@@ -115,31 +115,70 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
         case 3: // Red Squiggle
             if (rotation % 2 == 0) { // 1 and 3
                 blocks[0][0] = 0; blocks[0][1] = 1;
-                blocks[1][0] = 1; blocks[1][1] = 1;
-                blocks[2][0] = 1; blocks[2][1] = 2;
-            } else { // 2 and 4
-                blocks[0][0] = -1; blocks[0][1] = 0;
                 blocks[1][0] = -1; blocks[1][1] = 1;
-                blocks[2][0] = -2; blocks[2][1] = 1;
+                blocks[2][0] = -1; blocks[2][1] = 2;
+            } else { // 2 and 4
+                blocks[0][0] = 1; blocks[0][1] = 0;
+                blocks[1][0] = 1; blocks[1][1] = 1;
+                blocks[2][0] = 2; blocks[2][1] = 1;
             }
             break;
 
         case 4: // Orange L
             switch (rotation) {
                 case 0:
-                    blocks[0][0] = -1; blocks[0][1] = 0;
-                    blocks[1][0] = -2; blocks[1][1] = 0;
-                    blocks[2][0] = -2; blocks[2][1] = 1;
+                    blocks[0][0] = 1; blocks[0][1] = 0;
+                    blocks[1][0] = 2; blocks[1][1] = 0;
+                    blocks[2][0] = 2; blocks[2][1] = 1;
                     break;
                 case 1:
-                    blocks[0][0] = -1; blocks[0][1] = 0;
+                    blocks[0][0] = 1; blocks[0][1] = 0;
                     blocks[1][0] = 0; blocks[1][1] = 1;
                     blocks[2][0] = 0; blocks[2][1] = 2;
                     break;
                 case 2:
                     blocks[0][0] = 0; blocks[0][1] = 1;
+                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[2][0] = 2; blocks[2][1] = 1;
+                    break;
+                case 3:
+                    blocks[0][0] = 0; blocks[0][1] = 1;
+                    blocks[1][0] = 0; blocks[1][1] = 2;
+                    blocks[2][0] = -1; blocks[2][1] = 2;
+                    break;
+            }
+            break;
+
+        case 5: // Green Squiggle
+            if (rotation % 2 == 0) { // Rotations 1, 3
+                blocks[0][0] = 0; blocks[0][1] = 1;
+                blocks[1][0] = 1; blocks[1][1] = 1;
+                blocks[2][0] = 1; blocks[2][1] = 2;
+                break;
+            } else { // Rotations 2, 4
+                blocks[0][0] = 1; blocks[0][1] = 0;
+                blocks[1][0] = 0; blocks[1][1] = 1;
+                blocks[2][0] = -1; blocks[2][1] = 1;
+                break;
+            }
+            break;
+
+        case 6: // Pink L
+            switch (rotation) {
+                case 0:
+                    blocks[0][0] = 0; blocks[0][1] = 1;
                     blocks[1][0] = -1; blocks[1][1] = 1;
                     blocks[2][0] = -2; blocks[2][1] = 1;
+                    break;
+                case 1:
+                    blocks[0][0] = 1; blocks[0][1] = 0;
+                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[2][0] = 1; blocks[2][1] = 2;
+                    break;
+                case 2:
+                    blocks[0][0] = 0; blocks[0][1] = 1;
+                    blocks[1][0] = 1; blocks[1][1] = 0;
+                    blocks[2][0] = 2; blocks[2][1] = 0;
                     break;
                 case 3:
                     blocks[0][0] = 0; blocks[0][1] = 1;
@@ -149,76 +188,33 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
             }
             break;
 
-        case 5: // Green Squiggle
-            if (rotation % 2 == 0) { // Rotations 1, 3
-                blocks[0][0] = 0; blocks[0][1] = 1;
-                blocks[1][0] = -1; blocks[1][1] = 1;
-                blocks[2][0] = -1; blocks[2][1] = 2;
-                break;
-            } else { // Rotations 2, 4
-                blocks[0][0] = -1; blocks[0][1] = 0;
-                blocks[1][0] = 0; blocks[1][1] = 1;
-                blocks[2][0] = 1; blocks[2][1] = 1;
-                break;
-            }
-            break;
-
-        case 6: // Pink L
-            switch (rotation) {
-                case 0:
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 1;
-                    blocks[2][0] = 2; blocks[2][1] = 1;
-                    break;
-                case 1:
-                    blocks[0][0] = -1; blocks[0][1] = 0;
-                    blocks[1][0] = -1; blocks[1][1] = 1;
-                    blocks[2][0] = -1; blocks[2][1] = 2;
-                    break;
-                case 2:
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = -1; blocks[1][1] = 0;
-                    blocks[2][0] = -2; blocks[2][1] = 0;
-                    break;
-                case 3:
-                    blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 0; blocks[1][1] = 2;
-                    blocks[2][0] = -1; blocks[2][1] = 2;
-                    break;
-            }
-            break;
-
         case 7: // T
             switch (rotation) {
                 case 0:
                     blocks[0][0] = 0; blocks[0][1] = 1;
                     blocks[1][0] = 0; blocks[1][1] = 2;
-                    blocks[2][0] = -1; blocks[2][1] = 1;
+                    blocks[2][0] = 1; blocks[2][1] = 1;
                     break;
                 case 1:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 1;
-                    blocks[2][0] = -1; blocks[2][1] = 1;
+                    blocks[1][0] = -1; blocks[1][1] = 1;
+                    blocks[2][0] = 1; blocks[2][1] = 1;
                     break;
                 case 2:
                     blocks[0][0] = 0; blocks[0][1] = 1;
-                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[1][0] = -1; blocks[1][1] = 1;
                     blocks[2][0] = 0; blocks[2][1] = 2;
                     break;
                 case 3:
-                    blocks[0][0] = -1; blocks[0][1] = 0;
-                    blocks[1][0] = -1; blocks[1][1] = 1;
-                    blocks[2][0] = -2; blocks[2][1] = 0;
+                    blocks[0][0] = 1; blocks[0][1] = 0;
+                    blocks[1][0] = 1; blocks[1][1] = 1;
+                    blocks[2][0] = 2; blocks[2][1] = 0;
                     break;
             }
             break;
 
         default:
             return 0; // Invalid piece type
-    }
-
-    for (int i = 0; i < 3; i++) {
-        blocks[i][0] = -1 * blocks[i][0];
     }
 
     return 1; 
@@ -229,6 +225,26 @@ struct HistoryItem {
     int col;
     char hit; // 1 if hit, 0 if miss
 };
+
+void test_shapes() {
+    for (int shape = 1; shape <= 7; shape++) {
+        for (int rot = 1; rot <= 4; rot++) {
+            printf("\t\tSHAPE: %d, ROT: %d\n", shape, rot);
+            int blocks[3][2] = {0};
+            piece_offsets(shape, rot, blocks);
+            int board[6*4] = {0}; // [6][4]
+            board[2*4+0] = 1;
+            printf("2 0\n");
+            for (int i = 0; i < 3; i++) {
+                int row = 2 + blocks[i][0];
+                int col = 0 + blocks[i][1];
+                board[row*4+col] = 1;
+                printf("%d %d\n", row, col);
+            }
+            print_board((int*) board, 4, 6);
+        }
+    }
+}
 
 // RESPONSE:
 // error: E 101
@@ -470,7 +486,7 @@ int main() {
                     send_error(conn_fd1, 401);
                     continue;
                 }
-                
+
                 int hit_ship = board1[shoot_row * width + shoot_col];
                 char h_or_m = hit_ship == 0 ? 'M' : 'H';
                 board1[shoot_row*width+shoot_col] = -1;
@@ -555,7 +571,7 @@ int main() {
                     send_error(conn_fd2, 401);
                     continue;
                 }
-                
+
                 int hit_ship = board2[shoot_row * width + shoot_col];
                 char h_or_m = hit_ship == 0 ? 'M' : 'H';
                 board2[shoot_row*width+shoot_col] = -1;
