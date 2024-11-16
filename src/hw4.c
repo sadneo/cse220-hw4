@@ -230,17 +230,6 @@ struct HistoryItem {
     char hit; // 1 if hit, 0 if miss
 };
 
-int check_history(struct HistoryItem *history, int history_size, int shoot_row, int shoot_col) {
-    for (int i = 0; i < history_size; i++) {
-        struct HistoryItem item = history[i];
-        if (item.row == shoot_row || item.row == shoot_col) {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
 // RESPONSE:
 // error: E 101
 // halt: H 1
@@ -477,29 +466,21 @@ int main() {
                     send_error(conn_fd1, 400);
                     continue;
                 }
-                if (check_history(history1, history_size1, shoot_row, shoot_col)) {
+                if (board1[shoot_row*width+shoot_col] == -1) {
                     send_error(conn_fd1, 401);
                     continue;
                 }
                 
                 int hit_ship = board1[shoot_row * width + shoot_col];
                 char h_or_m = hit_ship == 0 ? 'M' : 'H';
-                if (hit_ship != 0) {
-                    for (int row = 0; row < height; row++) {
-                        for (int col = 0; col < width; col++) {
-                            if (board1[row * width + col] == hit_ship) {
-                                board1[row*width+col] = 0;
-                            }
-                        }
-                    }
-                }
+                board1[shoot_row*width+shoot_col] = -1;
 
                 int encountered_ships[5] = {0};
                 int ships_remaining = 0;
                 for (int row = 0; row < height; row++) {
                     for (int col = 0; col < width; col++) {
                         int ship = board1[row*width+col];
-                        if (ship != 0) {
+                        if (ship > 0) {
                             encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
                         }
                     }
@@ -508,35 +489,45 @@ int main() {
                     ships_remaining += encountered_ships[i];
                 }
 
-                struct HistoryItem new_history_item = history1[history_size1];
-                new_history_item.row = shoot_row;
-                new_history_item.col = shoot_col;
-                new_history_item.hit = h_or_m;
+                history1[history_size1].row = shoot_row;
+                history1[history_size1].col = shoot_col;
+                history1[history_size1].hit = h_or_m;
                 history_size1++;
 
                 memset(return_buffer, 0, 1028);
-                sprintf(return_buffer, "R 5 %d %c", ships_remaining, h_or_m);
+                sprintf(return_buffer, "R %d %c", ships_remaining, h_or_m);
                 send_a(conn_fd1, return_buffer, strlen(return_buffer));
 
                 if (ships_remaining == 0) {
-                    send_a(conn_fd1, "H 1", 3);
+                    read_to_buffer(buffer, conn_fd2);
                     send_a(conn_fd2, "H 0", 3);
+                    read_to_buffer(buffer, conn_fd1);
+                    send_a(conn_fd1, "H 1", 3);
                     goto cleanup;
                 }
                 break;
             } else if (*buffer == 'Q') {
-                struct HistoryItem *temp_history = malloc(sizeof(struct HistoryItem) * width * height);
-                for (int i = 0; i < history_size1; i++) {
-                    temp_history[i].row = history1[i].row;
-                    temp_history[i].col = history1[i].col;
-                    temp_history[i].hit = history1[i].hit;
-                }
-                sort(temp_history, width * height);
-
                 memset(return_buffer, 0, 1028);
-                sprintf(return_buffer, "R 5 %d %c", ships_remaining, h_or_m); // TODO set string fr
-                free(temp_history);
+                int encountered_ships[5] = {0};
+                int ships_remaining = 0;
+                for (int row = 0; row < height; row++) {
+                    for (int col = 0; col < width; col++) {
+                        int ship = board1[row*width+col];
+                        if (ship > 0) {
+                            encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
+                        }
+                    }
+                }
+                for (int i = 0; i < 5; i++) {
+                    ships_remaining += encountered_ships[i];
+                }
+                sprintf(return_buffer, "G %d", ships_remaining);
 
+                char temp_buffer[100] = {0};
+                for (int i = 0; i < history_size1; i++) {
+                    sprintf(temp_buffer, " %c %d %d", history1[i].hit, history1[i].col, history1[i].row);
+                    strcat(return_buffer, temp_buffer);
+                }
                 send_a(conn_fd1, return_buffer, strlen(return_buffer));
             } else {
                 send_error(conn_fd1, 102);
@@ -544,9 +535,94 @@ int main() {
         }
 
         // player 2's turn
+        while (1) {
+            read_to_buffer(buffer, conn_fd2);
+            if (strcmp(buffer, "F") == 0) {
+                send_a(conn_fd2, "H 0", 3);
+                send_a(conn_fd1, "H 1", 3);
+                goto cleanup;
+            } else if (*buffer == 'S') {
+                int shoot_row, shoot_col;
+                if (sscanf(buffer, "S %d %d %s", &shoot_row, &shoot_col, overflow_buffer) != 2) {
+                    send_error(conn_fd2, 202);
+                    continue;
+                }
+                if (shoot_row < 0 || shoot_row >= height || shoot_col < 0 || shoot_col >= height) {
+                    send_error(conn_fd2, 400);
+                    continue;
+                }
+                if (board2[shoot_row*width+shoot_col] == -1) {
+                    send_error(conn_fd2, 401);
+                    continue;
+                }
+                
+                int hit_ship = board2[shoot_row * width + shoot_col];
+                char h_or_m = hit_ship == 0 ? 'M' : 'H';
+                board2[shoot_row*width+shoot_col] = -1;
+
+                int encountered_ships[5] = {0};
+                int ships_remaining = 0;
+                for (int row = 0; row < height; row++) {
+                    for (int col = 0; col < width; col++) {
+                        int ship = board2[row*width+col];
+                        if (ship > 0) {
+                            encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
+                        }
+                    }
+                }
+                for (int i = 0; i < 5; i++) {
+                    ships_remaining += encountered_ships[i];
+                }
+
+                history2[history_size2].row = shoot_row;
+                history2[history_size2].col = shoot_col;
+                history2[history_size2].hit = h_or_m;
+                history_size2++;
+
+                memset(return_buffer, 0, 1028);
+                sprintf(return_buffer, "R %d %c", ships_remaining, h_or_m);
+                send_a(conn_fd2, return_buffer, strlen(return_buffer));
+
+                if (ships_remaining == 0) {
+                    read_to_buffer(buffer, conn_fd1);
+                    send_a(conn_fd1, "H 0", 3);
+                    read_to_buffer(buffer, conn_fd2);
+                    send_a(conn_fd2, "H 1", 3);
+                    goto cleanup;
+                }
+                break;
+            } else if (*buffer == 'Q') {
+                memset(return_buffer, 0, 1028);
+                int encountered_ships[5] = {0};
+                int ships_remaining = 0;
+                for (int row = 0; row < height; row++) {
+                    for (int col = 0; col < width; col++) {
+                        int ship = board2[row*width+col];
+                        if (ship > 0) {
+                            encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
+                        }
+                    }
+                }
+                for (int i = 0; i < 5; i++) {
+                    ships_remaining += encountered_ships[i];
+                }
+                sprintf(return_buffer, "G %d", ships_remaining);
+
+                char temp_buffer[100] = {0};
+                for (int i = 0; i < history_size2; i++) {
+                    sprintf(temp_buffer, " %c %d %d", history2[i].hit, history2[i].col, history2[i].row);
+                    strcat(return_buffer, temp_buffer);
+                }
+                send_a(conn_fd2, return_buffer, strlen(return_buffer));
+            } else {
+                send_error(conn_fd2, 102);
+            }
+        }
     }
 
 cleanup:
+    free(history1);
+    free(history2);
     close(conn_fd1);
     close(conn_fd2);
     close(listen_fd1);
