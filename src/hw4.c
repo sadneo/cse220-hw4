@@ -495,20 +495,20 @@ int main() {
                     send_error(conn_fd1, 400);
                     continue;
                 }
-                if (board1[shoot_row*width+shoot_col] == -1) {
+                if (board2[shoot_row*width+shoot_col] == -1) {
                     send_error(conn_fd1, 401);
                     continue;
                 }
 
-                int hit_ship = board1[shoot_row * width + shoot_col];
+                int hit_ship = board2[shoot_row * width + shoot_col];
                 char h_or_m = hit_ship <= 0 ? 'M' : 'H';
-                board1[shoot_row*width+shoot_col] = -1;
+                board2[shoot_row*width+shoot_col] = -1;
 
                 int encountered_ships[5] = {0};
                 int ships_remaining = 0;
                 for (int row = 0; row < height; row++) {
                     for (int col = 0; col < width; col++) {
-                        int ship = board1[row*width+col];
+                        int ship = board2[row*width+col];
                         if (ship > 0) {
                             encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
                         }
@@ -541,7 +541,7 @@ int main() {
                 int ships_remaining = 0;
                 for (int row = 0; row < height; row++) {
                     for (int col = 0; col < width; col++) {
-                        int ship = board1[row*width+col];
+                        int ship = board2[row*width+col];
                         if (ship > 0) {
                             encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
                         }
@@ -584,20 +584,20 @@ int main() {
                     send_error(conn_fd2, 400);
                     continue;
                 }
-                if (board2[shoot_row*width+shoot_col] == -1) {
+                if (board1[shoot_row*width+shoot_col] == -1) {
                     send_error(conn_fd2, 401);
                     continue;
                 }
 
-                int hit_ship = board2[shoot_row * width + shoot_col];
+                int hit_ship = board1[shoot_row * width + shoot_col];
                 char h_or_m = hit_ship <= 0 ? 'M' : 'H';
-                board2[shoot_row*width+shoot_col] = -1;
+                board1[shoot_row*width+shoot_col] = -1;
 
                 int encountered_ships[5] = {0};
                 int ships_remaining = 0;
                 for (int row = 0; row < height; row++) {
                     for (int col = 0; col < width; col++) {
-                        int ship = board2[row*width+col];
+                        int ship = board1[row*width+col];
                         if (ship > 0) {
                             encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
                         }
@@ -630,7 +630,7 @@ int main() {
                 int ships_remaining = 0;
                 for (int row = 0; row < height; row++) {
                     for (int col = 0; col < width; col++) {
-                        int ship = board2[row*width+col];
+                        int ship = board1[row*width+col];
                         if (ship > 0) {
                             encountered_ships[ship - 1] = 1; // offset from 1-5 to 0-4
                         }
