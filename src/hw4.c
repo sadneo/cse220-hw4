@@ -637,6 +637,8 @@ int main() {
     }
 
 cleanup:
+    free(board1);
+    free(board2);
     free(history1);
     free(history2);
     close(conn_fd1);
