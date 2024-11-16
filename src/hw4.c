@@ -363,7 +363,7 @@ int main() {
                 int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
                 // printf("Location %d: %d, row: %d, col: %d\n", i+1, locations[i+1], offset_row, offset_column);
-                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column > width) {
+                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
                     error = error > 302 ? 302 : error;
                     break;
                 }
@@ -437,7 +437,7 @@ int main() {
                 int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
                 // printf("Location %d: %d, row: %d, col: %d\n", i+1, locations[i+1], offset_row, offset_column);
-                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column > width) {
+                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
                     error = error > 302 ? 302 : error;
                     break;
                 }
@@ -478,7 +478,7 @@ int main() {
                     send_error(conn_fd1, 202);
                     continue;
                 }
-                if (shoot_row < 0 || shoot_row >= height || shoot_col < 0 || shoot_col >= height) {
+                if (shoot_row < 0 || shoot_row >= height || shoot_col < 0 || shoot_col >= width) {
                     send_error(conn_fd1, 400);
                     continue;
                 }
@@ -488,7 +488,7 @@ int main() {
                 }
 
                 int hit_ship = board1[shoot_row * width + shoot_col];
-                char h_or_m = hit_ship == 0 ? 'M' : 'H';
+                char h_or_m = hit_ship <= 0 ? 'M' : 'H';
                 board1[shoot_row*width+shoot_col] = -1;
 
                 int encountered_ships[5] = {0};
@@ -563,7 +563,7 @@ int main() {
                     send_error(conn_fd2, 202);
                     continue;
                 }
-                if (shoot_row < 0 || shoot_row >= height || shoot_col < 0 || shoot_col >= height) {
+                if (shoot_row < 0 || shoot_row >= height || shoot_col < 0 || shoot_col >= width) {
                     send_error(conn_fd2, 400);
                     continue;
                 }
@@ -573,7 +573,7 @@ int main() {
                 }
 
                 int hit_ship = board2[shoot_row * width + shoot_col];
-                char h_or_m = hit_ship == 0 ? 'M' : 'H';
+                char h_or_m = hit_ship <= 0 ? 'M' : 'H';
                 board2[shoot_row*width+shoot_col] = -1;
 
                 int encountered_ships[5] = {0};
