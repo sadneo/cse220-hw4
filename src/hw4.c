@@ -344,14 +344,11 @@ int main() {
 
         int error = 1000;
         for (int ship_no = 0; ship_no < 5; ship_no++) {
-            // printf("Player 1 init:\n");
-            // print_board(board1, width, height);
             int type = *(ship_data + ship_no*4 + 0);
             int rot = *(ship_data + ship_no*4 + 1);
             int col = *(ship_data + ship_no*4 + 2);
             int row = *(ship_data + ship_no*4 + 3);
 
-            // printf("\ttype %d, rot %d, col %d, row %d\n", type, rot, col, row);
             if (type <= 0 || type > 7) {
                 error = error > 300 ? 300 : error;
                 continue;
@@ -365,12 +362,10 @@ int main() {
             piece_offsets(type, rot, offsets);
             int locations[4] = {0};
             locations[0] = row * width + col;
-            // printf("Location 0: %d\n", locations[0]);
             for (int i = 0; i < 3; i++) {
                 int offset_row = row+offsets[i][0];
                 int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
-                // printf("Location %d: %d, row: %d, col: %d\n", i+1, locations[i+1], offset_row, offset_column);
                 if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
                     error = error > 302 ? 302 : error;
                     break;
@@ -385,8 +380,8 @@ int main() {
                 }
                 board1[location] = ship_no + 1;
             }
-            // printf("\tBOARD_STATE:\n");
-            // print_board(board1, width, height);
+            printf("\tBOARD_STATE:\n");
+            print_board(board1, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd1, error);
@@ -425,7 +420,6 @@ int main() {
             int col = *(ship_data + ship_no*4 + 2);
             int row = *(ship_data + ship_no*4 + 3);
 
-            // printf("\ttype %d, rot %d, col %d, row %d\n", type, rot, col, row);
             if (type <= 0 || type > 7) {
                 error = error > 300 ? 300 : error;
                 continue;
@@ -439,12 +433,10 @@ int main() {
             piece_offsets(type, rot, offsets);
             int locations[4] = {0};
             locations[0] = row * width + col;
-            // printf("Location 0: %d\n", locations[0]);
             for (int i = 0; i < 3; i++) {
                 int offset_row = row+offsets[i][0];
                 int offset_column = col+offsets[i][1];
                 locations[i+1] = offset_row * width + offset_column;
-                // printf("Location %d: %d, row: %d, col: %d\n", i+1, locations[i+1], offset_row, offset_column);
                 if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
                     error = error > 302 ? 302 : error;
                     break;
@@ -459,8 +451,8 @@ int main() {
                 }
                 board2[location] = ship_no + 1;
             }
-            // printf("\tBOARD_STATE:\n");
-            // print_board(board2, width, height);
+            printf("\tBOARD_STATE:\n");
+            print_board(board2, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd2, error);
