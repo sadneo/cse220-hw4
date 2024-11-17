@@ -87,11 +87,11 @@ int print_board(int board[], int width, int height) {
         for (int col = 0; col < width; col++) {
             int tile = board[row * width + col];
             if (tile == -1) {
-                printf("X ");
+                printf("▓");
             } else if (tile == 0) {
-                printf("_ ");
+                printf(".");
             } else {
-                printf("%d ", tile);
+                printf("%d", tile);
             }
         }
         printf("\n");
@@ -260,6 +260,8 @@ void test_shapes() {
 // S response R <ships_remaining> <{M for miss, H for hit}>
 // Q response: G <ships_remaining> for_each_guess:<{‘M’ for miss, ‘H’ for hit} column# row#>
 int main() {
+    // test_shapes();
+
     int listen_fd1 = bind_socket(PORT1);
     int listen_fd2 = bind_socket(PORT2);
     int conn_fd1 = listen_socket(listen_fd1, PORT1);
@@ -380,8 +382,8 @@ int main() {
                 }
                 board1[location] = ship_no + 1;
             }
-            printf("\tBOARD_STATE:\n");
-            print_board(board1, width, height);
+            //printf("\tBOARD_STATE:\n");
+            //print_board(board1, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd1, error);
@@ -391,8 +393,8 @@ int main() {
         send_a(conn_fd1, "A", 1);
         break;
     }
-    printf("Player 1 initialized\n");
-    print_board(board1, width, height);
+    //printf("Player 1 initialized\n");
+    //print_board(board1, width, height);
 
     while (1) {
         memset(board2, 0, width * height * sizeof(*board2));
@@ -451,8 +453,8 @@ int main() {
                 }
                 board2[location] = ship_no + 1;
             }
-            printf("\tBOARD_STATE:\n");
-            print_board(board2, width, height);
+            //printf("\tBOARD_STATE:\n");
+            //print_board(board2, width, height);
         }
         if (error < 1000) {
             send_error(conn_fd2, error);
@@ -462,7 +464,7 @@ int main() {
         send_a(conn_fd2, "A", 1);
         break;
     }
-    printf("Player 2 initialized\n");
+    //printf("Player 2 initialized\n");
 
     printf("Board 1\n");
     print_board(board1, width, height);
