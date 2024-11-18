@@ -11,7 +11,7 @@
 #define PORT2 2202
 #define BUFFER_SIZE 1024
 
-const int BOARD_MAX_SIZE = 100;
+const int BOARD_MAX_SIZE = 11;
 const int P_QUERY = 2;
 const int P_VALID = 10;
 const int P_OFF_BOARD = 2;
@@ -220,6 +220,9 @@ void generate_initialize(FILE *file, int *board, int width, int height) {
                     retry = 1;
                     break;
                 }
+            }
+            if (retry) {
+                break;
             }
 
             for (int i = 0; i < 4; i++) {
