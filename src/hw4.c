@@ -9,6 +9,8 @@
 #define PORT2 2202
 #define BUFFER_SIZE 1024
 
+char buffer[BUFFER_SIZE] = {0};
+char overflow_buffer[BUFFER_SIZE] = {0};
 char return_buffer[1028] = "";
 
 int bind_socket(uint16_t port) {
@@ -98,8 +100,16 @@ int print_board(int board[], int width, int height) {
     }
 }
 
-int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
+int piece_offsets(int piece_type, int rot, int row, int col, int width, int height, int ship_no, int *board) {
     int rotation = (rot - 1) % 4;
+    if (piece_type < 1 || piece_type > 7) {
+        return 7;
+    }
+    if (rot < 1 || rot > 4) {
+        return 4;
+    }
+
+    int blocks[3][2] = {0};
     switch (piece_type) {
         case 1: // Square 
             blocks[0][0] = 0; blocks[0][1] = 1;
@@ -219,12 +229,29 @@ int piece_offsets(int piece_type, int rot, int blocks[3][2]) {
                     break;
             }
             break;
-
-        default:
-            return 0; // Invalid piece type
     }
 
-    return 1; 
+    int locations[4] = {0};
+    locations[0] = row * width + col;
+    for (int i = 0; i < 3; i++) {
+        int offset_row = row+blocks[i][0];
+        int offset_column = col+blocks[i][1];
+        locations[i+1] = offset_row * width + offset_column;
+        printf("%d %d\n", offset_row, offset_column);
+        if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < 4; i ++) {
+        int location = locations[i];
+        if (board[location] != 0) {
+            return 0;
+        }
+        board[location] = ship_no;
+    }
+
+    return 1;
 }
 
 struct HistoryItem {
@@ -233,24 +260,86 @@ struct HistoryItem {
     char hit; // 1 if hit, 0 if miss
 };
 
-void test_shapes() {
-    for (int shape = 1; shape <= 7; shape++) {
-        for (int rot = 1; rot <= 4; rot++) {
-            printf("\t\tSHAPE: %d, ROT: %d\n", shape, rot);
-            int blocks[3][2] = {0};
-            piece_offsets(shape, rot, blocks);
-            int board[6*4] = {0}; // [6][4]
-            board[2*4+0] = 1;
-            printf("2 0\n");
-            for (int i = 0; i < 3; i++) {
-                int row = 2 + blocks[i][0];
-                int col = 0 + blocks[i][1];
-                board[row*4+col] = 1;
-                printf("%d %d\n", row, col);
-            }
-            print_board((int*) board, 4, 6);
-        }
+int handle_forfeit(int conn_fd, char packet_type, char letter, int offset) {
+    if (packet_type == 'F') {
+        return 1; // propogate forfeit
+    } else if (packet_type != letter) {
+        sprintf(return_buffer, "E %d", 100 + offset);
+        send(conn_fd, return_buffer, strlen(return_buffer), 0);
+    } else {
+        sprintf(return_buffer, "E %d", 200 + offset);
+        send(conn_fd, return_buffer, strlen(return_buffer), 0);
     }
+    return 0;
+}
+
+int init_valid_shape(int * input) {
+    for (int i = 0; i < 20; i += 4) {
+        if (input[i] > 7 || input[i] < 1) return 1;
+    }
+    return 0;
+}
+
+int init_valid_rotation(int * input) {
+    for (int i = 1; i < 20; i += 4) {
+        if (input[i] > 4 || input[i] < 1) return 1;
+    }
+    return 0;
+}
+
+int initialize(int conn_fd, int *board, int width, int height) {
+    char c;
+    int input[20] = {0};
+    int extra_offset;
+    // 0 = invalid as taken 
+    // -1 = out of bounds
+    // 1 = fine
+    // 7 = shape out of bounds
+    // 4 = rotation out bounds
+
+    int running = 1;
+    while (running) {
+        int last = 0;
+        int error = 1;
+        running = 1;
+
+        read_to_buffer(buffer, conn_fd);
+        while (sscanf(buffer, "%c %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d%n", &c,&input[0], &input[1], &input[2], &input[3], &input[4], &input[5], &input[6], &input[7], &input[8], &input[9], &input[10], &input[11], &input[12], &input[13], &input[14], &input[15], &input[16], &input[17], &input[18], &input[19], &extra_offset)!=21 || c != 'I' || c=='F' || buffer[extra_offset] != '\0'){
+            if (handle_forfeit(conn_fd, c, 'I', 1)) return 1;
+            read_to_buffer(buffer, conn_fd);
+        }
+
+        int real_error = 0;
+        memset(board, 0, sizeof(int) * width * height);
+        for (int i = 0; i < 20; i += 4){
+            error = piece_offsets(input[i], input[i+1], input[i+3], input[i+2], width, height, i / 4 + 1, board); 
+            if (error == 0) last = 1;
+            if (init_valid_shape(input) == 1){
+                send(conn_fd, "E 300", strlen("E 300"), 0);
+                running = 10;
+                break;
+            } else if(init_valid_rotation(input) == 1){
+                send(conn_fd, "E 301", strlen("E 301"), 0);
+                running=10;
+                break;
+            } else if(error == -1){
+                real_error = 302;
+                break;
+            } else if(error == 0){
+                real_error = real_error < 303 ? 303 : real_error;
+            }  
+        }
+        if (real_error) {
+            memset(board, 0, sizeof(board));
+            sprintf(return_buffer, "E %d", real_error);
+            send(conn_fd, return_buffer, 5, 0);
+            running=10;
+        }
+
+        if(running != 10) running = 0;
+    }
+    send(conn_fd, "A", strlen("A"), 0);
+    return 0;
 }
 
 // RESPONSE:
@@ -278,8 +367,6 @@ int main() {
     int *board2 = NULL;
     struct HistoryItem *history1 = NULL;
     struct HistoryItem *history2 = NULL;
-    char buffer[BUFFER_SIZE] = {0};
-    char overflow_buffer[BUFFER_SIZE] = {0};
 
     while (1) {
         read_to_buffer(buffer, conn_fd1);
@@ -325,146 +412,16 @@ int main() {
     }
     printf("Player 2 began\n");
 
-    while (1) {
-        memset(board1, 0, width * height * sizeof(*board1));
-        read_to_buffer(buffer, conn_fd1);
-        if (strcmp(buffer, "F") == 0) {
-            send_a(conn_fd1, "H 0", 3);
-            send_a(conn_fd2, "H 1", 3);
-            goto cleanup;
-        }
-        if (*buffer != 'I') {
-            send_error(conn_fd1, 101); // Invalid packet type (Expected Init packet)
-            continue;
-        }
-
-        int ship_data[20] = {0};
-        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19], overflow_buffer) != 20) {
-            send_error(conn_fd1, 201);
-            continue;
-        }
-
-        int error = 1000;
-        for (int ship_no = 0; ship_no < 5; ship_no++) {
-            int type = *(ship_data + ship_no*4 + 0);
-            int rot = *(ship_data + ship_no*4 + 1);
-            int col = *(ship_data + ship_no*4 + 2);
-            int row = *(ship_data + ship_no*4 + 3);
-
-            if (type <= 0 || type > 7) {
-                error = error > 300 ? 300 : error;
-                continue;
-            }
-            if (rot <= 0 || rot > 4) {
-                error = error > 301 ? 301 : error;
-                continue;
-            }
-
-            int offsets[3][2] = {0};
-            piece_offsets(type, rot, offsets);
-            int locations[4] = {0};
-            locations[0] = row * width + col;
-            for (int i = 0; i < 3; i++) {
-                int offset_row = row+offsets[i][0];
-                int offset_column = col+offsets[i][1];
-                locations[i+1] = offset_row * width + offset_column;
-                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
-                    error = error > 302 ? 302 : error;
-                    break;
-                }
-            }
-
-            for (int i = 0; i < 4; i++) {
-                int location = locations[i];
-                if (board1[location] != 0) {
-                    error = error > 303 ? 303 : error;
-                    break;
-                }
-                board1[location] = ship_no + 1;
-            }
-            //printf("\tBOARD_STATE:\n");
-            //print_board(board1, width, height);
-        }
-        if (error < 1000) {
-            send_error(conn_fd1, error);
-            continue;
-        }
-
-        send_a(conn_fd1, "A", 1);
-        break;
+    if (initialize(conn_fd1, board1, width, height)) {
+        send_a(conn_fd1, "H 0", 3);
+        send_a(conn_fd2, "H 1", 3);
+        goto cleanup;
     }
-    //printf("Player 1 initialized\n");
-    //print_board(board1, width, height);
-
-    while (1) {
-        memset(board2, 0, width * height * sizeof(*board2));
-        read_to_buffer(buffer, conn_fd2);
-        if (strcmp(buffer, "F") == 0) {
-            send_a(conn_fd2, "H 0", 3);
-            send_a(conn_fd1, "H 1", 3);
-            goto cleanup;
-        }
-        if (*buffer != 'I') {
-            send_error(conn_fd2, 101); // Invalid packet type (Expected Init packet)
-            continue;
-        }
-
-        int ship_data[20] = {0};
-        if (sscanf(buffer, "I %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %s", &ship_data[0], &ship_data[1], &ship_data[2], &ship_data[3], &ship_data[4], &ship_data[5], &ship_data[6], &ship_data[7], &ship_data[8], &ship_data[9], &ship_data[10], &ship_data[11], &ship_data[12], &ship_data[13], &ship_data[14], &ship_data[15], &ship_data[16], &ship_data[17], &ship_data[18], &ship_data[19], overflow_buffer) != 20) {
-            send_error(conn_fd2, 201);
-            continue;
-        }
-
-        int error = 1000;
-        for (int ship_no = 0; ship_no < 5; ship_no++) {
-            int type = *(ship_data + ship_no*4 + 0);
-            int rot = *(ship_data + ship_no*4 + 1);
-            int col = *(ship_data + ship_no*4 + 2);
-            int row = *(ship_data + ship_no*4 + 3);
-
-            if (type <= 0 || type > 7) {
-                error = error > 300 ? 300 : error;
-                continue;
-            }
-            if (rot <= 0 || rot > 4) {
-                error = error > 301 ? 301 : error;
-                continue;
-            }
-
-            int offsets[3][2] = {0};
-            piece_offsets(type, rot, offsets);
-            int locations[4] = {0};
-            locations[0] = row * width + col;
-            for (int i = 0; i < 3; i++) {
-                int offset_row = row+offsets[i][0];
-                int offset_column = col+offsets[i][1];
-                locations[i+1] = offset_row * width + offset_column;
-                if (offset_row < 0 || offset_row >= height || offset_column < 0 || offset_column >= width) {
-                    error = error > 302 ? 302 : error;
-                    break;
-                }
-            }
-
-            for (int i = 0; i < 4; i++) {
-                int location = locations[i];
-                if (board2[location] != 0) {
-                    error = error > 303 ? 303 : error;
-                    break;
-                }
-                board2[location] = ship_no + 1;
-            }
-            //printf("\tBOARD_STATE:\n");
-            //print_board(board2, width, height);
-        }
-        if (error < 1000) {
-            send_error(conn_fd2, error);
-            continue;
-        }
-
-        send_a(conn_fd2, "A", 1);
-        break;
+    if (initialize(conn_fd2, board2, width, height)) {
+        send_a(conn_fd1, "H 1", 3);
+        send_a(conn_fd2, "H 0", 3);
+        goto cleanup;
     }
-    //printf("Player 2 initialized\n");
 
     printf("Board 1\n");
     print_board(board1, width, height);
